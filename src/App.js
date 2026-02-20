@@ -465,7 +465,23 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [adminTab, setAdminTab] = useState("requests");
 // Load resources from Firebase when app starts
+useEffect(() => {// Load access requests from Firebase
 useEffect(() => {
+  const loadRequests = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "requests"));
+      const loadedRequests = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRequests(loadedRequests);
+    } catch (error) {
+      console.error("Error loading requests:", error);
+    }
+  };
+  
+  loadRequests();
+}, []);
   const loadResources = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "resources"));
@@ -515,8 +531,23 @@ useEffect(() => {
     const result = await signInWithPopup(auth, googleProvider);
     const user = result.user;
     console.log("Signed in:", user.email);
-    // For now, everyone goes to feed. We'll add admin logic later
-    setScreen("feed");
+    
+    // Check if user is approved
+    const approvedSnapshot = await getDocs(collection(db, "approvedUsers"));
+    const approvedEmails = approvedSnapshot.docs.map(doc => doc.data().email);
+    
+    // Admin emails always get access
+    const adminEmails = ["expandvisionmedia@gmail.com", user.email.includes("admin")];
+    const isAdmin = adminEmails.some(check => typeof check === "string" ? user.email === check : check);
+    
+    if (isAdmin) {
+      setScreen("admin");
+    } else if (approvedEmails.includes(user.email)) {
+      setScreen("feed");
+    } else {
+      alert("Your access request is pending approval. Please contact the admin.");
+      await auth.signOut();
+    }
   } catch (error) {
     console.error("Sign in error:", error);
     alert("Sign in failed. Please try again.");
@@ -564,18 +595,49 @@ useEffect(() => {
     showToast("✓ Thumbnail updated!");
   };
 
-  const handleApprove = id => {
-    const req = requests.find(r => r.id === id);
-    setRequests(prev => prev.map(r => r.id===id ? {...r, status:"approved"} : r));
-    setMembers(prev => [...prev, { id:Date.now(), name:req.name, email:req.email, joined:req.date, saves:0 }]);
+  const handleApprove = async (id) => {
+  const req = requests.find(r => r.id === id);
+  try {
+    // Add to approved users collection
+    await addDoc(collection(db, "approvedUsers"), {
+      email: req.email,
+      name: req.name,
+      approvedDate: new Date().toISOString().split("T")[0]
+    });
+    
+    // Update request status
+    setRequests(prev => prev.map(r => r.id === id ? {...r, status: "approved"} : r));
+    setMembers(prev => [...prev, { id: Date.now(), name: req.name, email: req.email, joined: req.date, saves: 0 }]);
     showToast("✓ Access approved!");
-  };
+  } catch (error) {
+    console.error("Error approving user:", error);
+    showToast("Failed to approve user");
+  }
+};
 
   const handleDeny = id => {
     setRequests(prev => prev.map(r => r.id===id ? {...r, status:"denied"} : r));
     showToast("Request denied.");
   };
-
+const handleSignupRequest = async () => {
+  if (!signupName.trim() || !signupEmail.trim()) return;
+  
+  try {
+    await addDoc(collection(db, "requests"), {
+      name: signupName.trim(),
+      email: signupEmail.trim(),
+      reason: signupReason.trim() || "",
+      date: new Date().toISOString().split("T")[0],
+      status: "pending"
+    });
+    
+    setPending(true);
+    showToast("✓ Request submitted!");
+  } catch (error) {
+    console.error("Error submitting request:", error);
+    showToast("Failed to submit request");
+  }
+};
   const categories = [
     { id:"all",       label:"All Resources",   emoji:"🗂️", count:resources.length },
     { id:"reference", label:"References",       emoji:"📸", count:resources.filter(r=>r.type==="reference").length },
@@ -641,7 +703,7 @@ useEffect(() => {
               {[["Your Name","text","First Last",signupName,setSignupName],["Email Address","email","you@gmail.com",signupEmail,setSignupEmail],["Why do you want access?","text","I'm a friend of...",signupReason,setSignupReason]].map(([lbl,type,ph,val,set])=>(
                 <div key={lbl}><label style={labelStyle}>{lbl}</label><input type={type} placeholder={ph} value={val} onChange={e=>set(e.target.value)} style={inputStyle}/></div>
               ))}
-              <button onClick={()=>{if(signupName&&signupEmail)setPending(true);}} style={{width:"100%",background:C.accent,color:"#fff",border:"none",borderRadius:6,padding:"13px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"system-ui, sans-serif"}}>Send Request</button>
+              <onClick={handleSignupRequest} style={{width:"100%",background:C.accent,color:"#fff",border:"none",borderRadius:6,padding:"13px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"system-ui, sans-serif"}}>Send Request</button>
             </div>
           )}
           {tab==="signup" && pending && (
