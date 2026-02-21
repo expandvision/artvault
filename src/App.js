@@ -703,7 +703,7 @@ const handleSignupRequest = async () => {
               {[["Your Name","text","First Last",signupName,setSignupName],["Email Address","email","you@gmail.com",signupEmail,setSignupEmail],["Why do you want access?","text","I'm a friend of...",signupReason,setSignupReason]].map(([lbl,type,ph,val,set])=>(
                 <div key={lbl}><label style={labelStyle}>{lbl}</label><input type={type} placeholder={ph} value={val} onChange={e=>set(e.target.value)} style={inputStyle}/></div>
               ))}
-              <onClick={handleSignupRequest} style={{width:"100%",background:C.accent,color:"#fff",border:"none",borderRadius:6,padding:"13px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"system-ui, sans-serif"}}>Send Request</button>
+              <button onClick={handleSignupRequest} style={{width:"100%",background:C.accent,color:"#fff",border:"none",borderRadius:6,padding:"13px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"system-ui, sans-serif"}}>Send Request</button>
             </div>
           )}
           {tab==="signup" && pending && (
