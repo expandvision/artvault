@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { auth, googleProvider } from "./firebase";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
 import { db } from "./firebase";
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 const INITIAL_RESOURCES = [
@@ -524,30 +524,41 @@ useEffect(() => {
   
   loadResources();
 }, []);
+useEffect(() => {
+  const checkRedirect = async () => {
+    try {
+      const result = await getRedirectResult(auth);
+      if (result?.user) {
+        const user = result.user;
+        console.log("Signed in:", user.email);
+        
+        // Check if user is approved
+        const approvedSnapshot = await getDocs(collection(db, "approvedUsers"));
+        const approvedEmails = approvedSnapshot.docs.map(doc => doc.data().email);
+        
+        const adminEmails = ["expandvisionmedia@gmail.com"];
+        
+        if (adminEmails.includes(user.email)) {
+          setScreen("admin");
+        } else if (approvedEmails.includes(user.email)) {
+          setScreen("feed");
+        } else {
+          alert("Your access request is pending approval. Please contact the admin.");
+          await auth.signOut();
+        }
+      }
+    } catch (error) {
+      console.error("Redirect error:", error);
+    }
+  };
+  
+  checkRedirect();
+}, []);
   const showToast = msg => { setToast(msg); setTimeout(()=>setToast(""), 2800); };
 
   const handleLogin = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    console.log("Signed in:", user.email);
-    
-    // Check if user is approved
-    const approvedSnapshot = await getDocs(collection(db, "approvedUsers"));
-    const approvedEmails = approvedSnapshot.docs.map(doc => doc.data().email);
-    
-    // Admin emails always get access
-    const adminEmails = ["expandvisionmedia@gmail.com", user.email.includes("admin")];
-    const isAdmin = adminEmails.some(check => typeof check === "string" ? user.email === check : check);
-    
-    if (isAdmin) {
-      setScreen("admin");
-    } else if (approvedEmails.includes(user.email)) {
-      setScreen("feed");
-    } else {
-      alert("Your access request is pending approval. Please contact the admin.");
-      await auth.signOut();
-    }
+    await signInWithRedirect(auth, googleProvider);
   } catch (error) {
     console.error("Sign in error:", error);
     alert("Sign in failed. Please try again.");
