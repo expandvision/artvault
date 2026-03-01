@@ -465,7 +465,6 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [adminTab, setAdminTab] = useState("requests");
 // Load resources from Firebase when app starts
-useEffect(() => {// Load access requests from Firebase
 useEffect(() => {
   const loadRequests = async () => {
     try {
@@ -482,6 +481,7 @@ useEffect(() => {
   
   loadRequests();
 }, []);
+useEffect(() => {
   const loadResources = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "resources"));
